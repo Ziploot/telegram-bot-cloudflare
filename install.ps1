@@ -22,56 +22,16 @@ try {
         }
     }
 
-    $useDefault = Read-Host "[INPUT] Do you want to use the default Echo Bot script? (Y/N)"
-    $botCode = ""
-    if ($useDefault.Trim().ToUpper() -eq "N") {
-        Write-Host "`n[INPUT] Paste your custom JavaScript bot code below." -ForegroundColor Cyan
-        Write-Host "When finished, type 'EOF' on a new line and press Enter:" -ForegroundColor Yellow
-        $codeLines = @()
-        do {
-            $line = Read-Host
-            if ($line.Trim() -eq "EOF") { break }
-            $codeLines += $line
-        } while ($true)
-        $botCode = $codeLines -join "`r`n"
-    } else {
-        # Default Template
-        $botCode = @'
-export default {
-  async fetch(request, env) {
-    if (request.method !== "POST") {
-      return new Response("Send POST requests only.", { status: 405 });
-    }
-    try {
-      const payload = await request.json();
-      if (payload.message) {
-        const chatId = payload.message.chat.id;
-        const text = payload.message.text || "";
-
-        let replyText = `You said: "${text}". Welcome to Serverless Telegram!`;
-        if (text.startsWith("/start")) {
-          replyText = "Hello! I am running 24/7 serverless on Cloudflare Workers edge network.\n\nCreated using ZipLoot Template.";
-        }
-
-        const botToken = env.TELEGRAM_TOKEN;
-        const url = `https://api.telegram.org/bot${botToken}/sendMessage`;
-        await fetch(url, {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
-            chat_id: chatId,
-            text: replyText,
-          }),
-        });
-      }
-      return new Response("OK", { status: 200 });
-    } catch (err) {
-      return new Response(err.toString(), { status: 500 });
-    }
-  }
-};
-'@
-    }
+    # Prompt user directly to enter their custom script
+    Write-Host "`n[INPUT] Paste your custom JavaScript bot code below." -ForegroundColor Cyan
+    Write-Host "When finished, type 'EOF' on a new line and press Enter:" -ForegroundColor Yellow
+    $codeLines = @()
+    do {
+        $line = Read-Host
+        if ($line.Trim() -eq "EOF") { break }
+        $codeLines += $line
+    } while ($true)
+    $botCode = $codeLines -join "`r`n"
 
     Write-Host "`n[INFO] All inputs collected! Starting automatic setup, please wait...`n" -ForegroundColor Green
 
