@@ -4,31 +4,20 @@ echo "=============================================="
 echo "⚡ ZipLoot - Linux/macOS Auto-Installer ⚡"
 echo "=============================================="
 
-# 1. Check Node.js
-if ! command -v node &> /dev/null; then
-    echo "⚠️ Node.js not detected. Attempting to install Node.js..."
-    if command -v apt-get &> /dev/null; then
-        sudo apt-get update && sudo apt-get install -y nodejs npm
-    elif command -v brew &> /dev/null; then
-        brew install node
-    elif command -v yum &> /dev/null; then
-        sudo yum install -y nodejs npm
-    else
-        echo "❌ Unsupported package manager. Please install Node.js manually."
-        exit 1
-    fi
-    echo "✅ Node.js successfully installed!"
-else
-    echo "✅ Node.js is already installed."
-fi
+# --- COLLECT ALL INPUTS UPFRONT ---
 
-# Create project folder locally
-PROJECT_DIR="$(pwd)/telegram-bot-cloudflare"
-mkdir -p "$PROJECT_DIR"
-cd "$PROJECT_DIR"
+TELEGRAM_TOKEN=""
+while [ -z "$TELEGRAM_TOKEN" ]; do
+    read -p "[INPUT] Enter your Telegram Bot API Token from @BotFather: " TELEGRAM_TOKEN
+done
 
-# 2. Get Bot Code Option
-read -p "❓ Do you want to use the default Echo Bot script? (Y/N): " use_default
+SUBDOMAIN=""
+while [ -z "$SUBDOMAIN" ]; do
+    read -p "[INPUT] Enter your Cloudflare workers.dev subdomain (e.g. 'ziploot'): " SUBDOMAIN_INPUT
+    SUBDOMAIN=$(echo "$SUBDOMAIN_INPUT" | sed 's/\.workers\.dev//g' | xargs)
+done
+
+read -p "[INPUT] Do you want to use the default Echo Bot script? (Y/N): " use_default
 bot_code=""
 
 if [ "$use_default" = "N" ] || [ "$use_default" = "n" ]; then
@@ -84,6 +73,33 @@ EOF
 )
 fi
 
+echo -e "
+[INFO] All inputs collected! Starting automatic setup, please wait...
+"
+
+# 1. Check Node.js
+if ! command -v node &> /dev/null; then
+    echo "⚠️ Node.js not detected. Attempting to install Node.js..."
+    if command -v apt-get &> /dev/null; then
+        sudo apt-get update && sudo apt-get install -y nodejs npm
+    elif command -v brew &> /dev/null; then
+        brew install node
+    elif command -v yum &> /dev/null; then
+        sudo yum install -y nodejs npm
+    else
+        echo "❌ Unsupported package manager. Please install Node.js manually."
+        exit 1
+    fi
+    echo "✅ Node.js successfully installed!"
+else
+    echo "✅ Node.js is already installed."
+fi
+
+# Create project folder locally
+PROJECT_DIR="$(pwd)/telegram-bot-cloudflare-project"
+mkdir -p "$PROJECT_DIR"
+cd "$PROJECT_DIR"
+
 echo -e "$bot_code" > index.js
 
 echo "📥 Fetching package metadata from Ziploot..."
@@ -96,28 +112,13 @@ npm install
 echo "🔑 Logging in to Cloudflare..."
 npx wrangler login
 
-echo ""
-read -p "🔑 Enter your Telegram Bot API Token from @BotFather: " TELEGRAM_TOKEN
-if [ -z "$TELEGRAM_TOKEN" ]; then
-    echo "❌ Token cannot be empty."
-    exit 1
-fi
-
 echo "🔒 Saving Telegram token securely in Cloudflare..."
 echo "$TELEGRAM_TOKEN" | npx wrangler secret put TELEGRAM_TOKEN
 
 echo "🚀 Deploying worker to Cloudflare..."
-DEPLOY_OUTPUT=$(npx wrangler deploy)
-echo "$DEPLOY_OUTPUT"
+npx wrangler deploy
 
-# Extract URL
-WORKER_URL=$(echo "$DEPLOY_OUTPUT" | grep -oE "https://[a-zA-Z0-9.-]+\.workers\.dev" | head -n 1)
-
-if [ -z "$WORKER_URL" ]; then
-    echo "❌ Deployment failed or URL could not be parsed."
-    exit 1
-fi
-
+WORKER_URL="https://telegram-bot-cloudflare.${SUBDOMAIN}.workers.dev"
 echo "✅ Worker live at: $WORKER_URL"
 
 echo "🔗 Registering webhook with Telegram API..."
