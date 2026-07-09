@@ -27,23 +27,20 @@ try {
         Write-Host "✅ Node.js is already installed." -ForegroundColor Green
     }
 
-    # Navigate to Home before deleting/creating to avoid folder-in-use locks
-    $tempFolder = "$env:TEMP\telegram-bot-cloudflare"
-    if ($pwd.Path -eq $tempFolder) {
-        Set-Location $env:USERPROFILE
+    # Create project folder locally in the user's CURRENT directory instead of Temp
+    $projectFolder = Join-Path $pwd "telegram-bot-cloudflare"
+    if (Test-Path $projectFolder) {
+        Write-Host "⚠️ Folder 'telegram-bot-cloudflare' already exists in this directory." -ForegroundColor Yellow
+    } else {
+        New-Item -ItemType Directory -Path $projectFolder -ErrorAction SilentlyContinue | Out-Null
     }
-
-    if (Test-Path $tempFolder) { 
-        Remove-Item $tempFolder -Recurse -Force -ErrorAction SilentlyContinue 
-    }
-    New-Item -ItemType Directory -Path $tempFolder -ErrorAction SilentlyContinue | Out-Null
 
     Write-Host "📥 Fetching template code from Ziploot repo..." -ForegroundColor Cyan
-    Invoke-WebRequest -UserAgent $ua -Uri "https://raw.githubusercontent.com/Ziploot/telegram-bot-cloudflare/main/index.js?t=$(Get-Date -UFormat %s)" -OutFile "$tempFolder\index.js"
-    Invoke-WebRequest -UserAgent $ua -Uri "https://raw.githubusercontent.com/Ziploot/telegram-bot-cloudflare/main/wrangler.json?t=$(Get-Date -UFormat %s)" -OutFile "$tempFolder\wrangler.json"
-    Invoke-WebRequest -UserAgent $ua -Uri "https://raw.githubusercontent.com/Ziploot/telegram-bot-cloudflare/main/package.json?t=$(Get-Date -UFormat %s)" -OutFile "$tempFolder\package.json"
+    Invoke-WebRequest -UserAgent $ua -Uri "https://raw.githubusercontent.com/Ziploot/telegram-bot-cloudflare/main/index.js?t=$(Get-Date -UFormat %s)" -OutFile "$projectFolder\index.js"
+    Invoke-WebRequest -UserAgent $ua -Uri "https://raw.githubusercontent.com/Ziploot/telegram-bot-cloudflare/main/wrangler.json?t=$(Get-Date -UFormat %s)" -OutFile "$projectFolder\wrangler.json"
+    Invoke-WebRequest -UserAgent $ua -Uri "https://raw.githubusercontent.com/Ziploot/telegram-bot-cloudflare/main/package.json?t=$(Get-Date -UFormat %s)" -OutFile "$projectFolder\package.json"
 
-    Set-Location $tempFolder
+    Set-Location $projectFolder
 
     Write-Host "📦 Installing dependencies locally..." -ForegroundColor Cyan
     cmd.exe /c "npm install"
@@ -59,7 +56,6 @@ try {
     }
 
     Write-Host "🔒 Saving Telegram token securely in Cloudflare..." -ForegroundColor Cyan
-    # Run pipeline inside cmd.exe directly to prevent PowerShell pipeline crashes
     cmd.exe /c "echo $token | npx wrangler secret put TELEGRAM_TOKEN"
 
     Write-Host "🚀 Deploying worker to Cloudflare..." -ForegroundColor Cyan
@@ -82,6 +78,8 @@ try {
     Write-Host "Response from Telegram: $response"
 
     Write-Host "`n🎉 Congratulations! Your serverless bot is now 24/7 online!" -ForegroundColor Green
+    Write-Host "`n📁 Project Folder: $projectFolder" -ForegroundColor Cyan
+    Write-Host "✍️  To edit/paste your custom bot code, open '$projectFolder\index.js' in VS Code, modify the logic, and run 'npx wrangler deploy' in the terminal to update!" -ForegroundColor Yellow
     Read-Host "`nSetup completed. Press Enter to exit..."
 } catch {
     Write-Host "❌ An unexpected error occurred: $_" -ForegroundColor Red
