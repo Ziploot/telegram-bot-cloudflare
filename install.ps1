@@ -27,7 +27,7 @@ try {
         Write-Host "✅ Node.js is already installed." -ForegroundColor Green
     }
 
-    # Create project folder locally
+    # Create project folder locally in the user's current directory
     $projectFolder = Join-Path $pwd "telegram-bot-cloudflare"
     if (Test-Path $projectFolder) {
         Write-Host "⚠️ Folder 'telegram-bot-cloudflare' already exists in this directory." -ForegroundColor Yellow
@@ -114,13 +114,16 @@ export default {
     cmd.exe /c "echo $token | npx wrangler secret put TELEGRAM_TOKEN"
 
     Write-Host "🚀 Deploying worker to Cloudflare..." -ForegroundColor Cyan
-    $deployOutput = cmd.exe /c "npx wrangler deploy"
-    Write-Host $deployOutput
+    # Stream output to screen in real time AND log to file using Tee-Object
+    $logFile = "$projectFolder\deploy.log"
+    cmd.exe /c "npx wrangler deploy" | Tee-Object -FilePath $logFile
+
+    $deployOutput = Get-Content $logFile -Raw
 
     # Extract worker url
     $urlMatch = [regex]::Match($deployOutput, "https://[a-zA-Z0-9.-]+\.workers\.dev")
     if (-not $urlMatch.Success) {
-        Write-Host "❌ Deployment succeeded but URL could not be parsed." -ForegroundColor Red
+        Write-Host "❌ Deployment succeeded but URL could not be parsed from logs." -ForegroundColor Red
         Read-Host "Press Enter to exit..."
         Exit
     }
