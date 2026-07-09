@@ -13,7 +13,7 @@ try {
         winget install OpenJS.NodeJS --silent --accept-package-agreements --accept-source-agreements
         
         # Update PATH env in current session so npx works immediately
-        $env:Path += ";$env:ProgramFiles\nodejs"
+        $env:Path += ";$env:ProgramFiles\\nodejs"
         
         # Verify installation
         $nodeVerify = Get-Command node -ErrorAction SilentlyContinue
@@ -67,9 +67,7 @@ export default {
 
         let replyText = `You said: "${text}". Welcome to Serverless Telegram!`;
         if (text.startsWith("/start")) {
-          replyText = "Hello! I am running 24/7 serverless on Cloudflare Workers edge network.
-
-Created using ZipLoot Template.";
+          replyText = "Hello! I am running 24/7 serverless on Cloudflare Workers edge network.\n\nCreated using ZipLoot Template.";
         }
 
         const botToken = env.TELEGRAM_TOKEN;
@@ -93,11 +91,11 @@ Created using ZipLoot Template.";
     }
 
     # Write bot code to local file
-    $botCode | Out-File -FilePath "$projectFolder\index.js" -Encoding utf8 -Force
+    $botCode | Out-File -FilePath "$projectFolder\\index.js" -Encoding utf8 -Force
 
     Write-Host "📥 Fetching package metadata from Ziploot..." -ForegroundColor Cyan
-    Invoke-WebRequest -UserAgent $ua -Uri "https://raw.githubusercontent.com/Ziploot/telegram-bot-cloudflare/main/wrangler.json?t=$(Get-Date -UFormat %s)" -OutFile "$projectFolder\wrangler.json"
-    Invoke-WebRequest -UserAgent $ua -Uri "https://raw.githubusercontent.com/Ziploot/telegram-bot-cloudflare/main/package.json?t=$(Get-Date -UFormat %s)" -OutFile "$projectFolder\package.json"
+    Invoke-WebRequest -UserAgent $ua -Uri "https://raw.githubusercontent.com/Ziploot/telegram-bot-cloudflare/main/wrangler.json?t=$(Get-Date -UFormat %s)" -OutFile "$projectFolder\\wrangler.json"
+    Invoke-WebRequest -UserAgent $ua -Uri "https://raw.githubusercontent.com/Ziploot/telegram-bot-cloudflare/main/package.json?t=$(Get-Date -UFormat %s)" -OutFile "$projectFolder\\package.json"
 
     Write-Host "📦 Installing dependencies locally..." -ForegroundColor Cyan
     cmd.exe /c "npm install"
@@ -117,13 +115,13 @@ Created using ZipLoot Template.";
 
     Write-Host "🚀 Deploying worker to Cloudflare..." -ForegroundColor Cyan
     # Stream output to screen in real time AND log to file using Tee-Object
-    $logFile = "$projectFolder\deploy.log"
+    $logFile = "$projectFolder\\deploy.log"
     cmd.exe /c "npx wrangler deploy" | Tee-Object -FilePath $logFile
 
     $deployOutput = Get-Content $logFile -Raw
 
     # Extract worker url
-    $urlMatch = [regex]::Match($deployOutput, "https://[a-zA-Z0-9.-]+\.workers\.dev")
+    $urlMatch = [regex]::Match($deployOutput, "https://[a-zA-Z0-9.-]+\\.workers\\.dev")
     if (-not $urlMatch.Success) {
         Write-Host "❌ Deployment succeeded but URL could not be parsed from logs." -ForegroundColor Red
         Read-Host "Press Enter to exit..."
