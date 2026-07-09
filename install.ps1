@@ -5,6 +5,7 @@ try {
     Write-Host "==============================================" -ForegroundColor Green
 
     $ua = "Mozilla/5.0 (Windows NT 10.0; Win64; x64)"
+    $scriptDir = Split-Path -Parent $MyInvocation.MyCommand.Definition
 
     # 1. Check Node.js
     $nodeInstalled = Get-Command node -ErrorAction SilentlyContinue
@@ -27,22 +28,20 @@ try {
         Write-Host "✅ Node.js is already installed." -ForegroundColor Green
     }
 
-    # Create project folder locally in the user's current directory
-    $projectFolder = Join-Path $pwd "telegram-bot-cloudflare"
+    # Create project folder locally in the user's CURRENT directory where they ran the installer
+    # (Since this script is launched from the extraction folder, we use the parent of that folder or the current shell location)
+    $projectFolder = Join-Path $pwd "telegram-bot-cloudflare-project"
     if (Test-Path $projectFolder) {
-        Write-Host "⚠️ Folder 'telegram-bot-cloudflare' already exists in this directory." -ForegroundColor Yellow
+        Write-Host "⚠️ Folder 'telegram-bot-cloudflare-project' already exists." -ForegroundColor Yellow
     } else {
         New-Item -ItemType Directory -Path $projectFolder -ErrorAction SilentlyContinue | Out-Null
     }
 
-    Set-Location $projectFolder
-
     # 2. Get Bot Code Option
     $useDefault = Read-Host "`n❓ Do you want to use the default Echo Bot script? (Y/N)"
-    $botCode = ""
-
+    
     if ($useDefault.Trim().ToUpper() -eq "N") {
-        Write-Host "`n✍️ Paste your custom JavaScript bot code below." -ForegroundColor Cyan
+        Write-Host "`n✍ / Paste your custom JavaScript bot code below." -ForegroundColor Cyan
         Write-Host "When finished, type 'EOF' on a new line and press Enter:" -ForegroundColor Yellow
         $codeLines = @()
         do {
@@ -51,51 +50,17 @@ try {
             $codeLines += $line
         } while ($true)
         $botCode = $codeLines -join "`r`n"
+        $botCode | Out-File -FilePath "$projectFolder\\index.js" -Encoding utf8 -Force
     } else {
-        # Default Template (using single-quoted here-string to prevent PowerShell parsing errors)
-        $botCode = @'
-export default {
-  async fetch(request, env) {
-    if (request.method !== "POST") {
-      return new Response("Send POST requests only.", { status: 405 });
-    }
-    try {
-      const payload = await request.json();
-      if (payload.message) {
-        const chatId = payload.message.chat.id;
-        const text = payload.message.text || "";
-
-        let replyText = `You said: "${text}". Welcome to Serverless Telegram!`;
-        if (text.startsWith("/start")) {
-          replyText = "Hello! I am running 24/7 serverless on Cloudflare Workers edge network.\n\nCreated using ZipLoot Template.";
-        }
-
-        const botToken = env.TELEGRAM_TOKEN;
-        const url = `https://api.telegram.org/bot${botToken}/sendMessage`;
-        await fetch(url, {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
-            chat_id: chatId,
-            text: replyText,
-          }),
-        });
-      }
-      return new Response("OK", { status: 200 });
-    } catch (err) {
-      return new Response(err.toString(), { status: 500 });
-    }
-  }
-};
-'@
+        # Copy the default template index.js already packaged in the ZIP
+        Copy-Item -Path "$scriptDir\\index.js" -Destination "$projectFolder\\index.js" -Force
     }
 
-    # Write bot code to local file
-    $botCode | Out-File -FilePath "$projectFolder\\index.js" -Encoding utf8 -Force
+    # Copy package.json and wrangler.json already packaged in the ZIP
+    Copy-Item -Path "$scriptDir\\wrangler.json" -Destination "$projectFolder\\wrangler.json" -Force
+    Copy-Item -Path "$scriptDir\\package.json" -Destination "$projectFolder\\package.json" -Force
 
-    Write-Host "📥 Fetching package metadata from Ziploot..." -ForegroundColor Cyan
-    Invoke-WebRequest -UserAgent $ua -Uri "https://raw.githubusercontent.com/Ziploot/telegram-bot-cloudflare/main/wrangler.json?t=$(Get-Date -UFormat %s)" -OutFile "$projectFolder\\wrangler.json"
-    Invoke-WebRequest -UserAgent $ua -Uri "https://raw.githubusercontent.com/Ziploot/telegram-bot-cloudflare/main/package.json?t=$(Get-Date -UFormat %s)" -OutFile "$projectFolder\\package.json"
+    Set-Location $projectFolder
 
     Write-Host "📦 Installing dependencies locally..." -ForegroundColor Cyan
     cmd.exe /c "npm install"
