@@ -17,61 +17,17 @@ while [ -z "$SUBDOMAIN" ]; do
     SUBDOMAIN=$(echo "$SUBDOMAIN_INPUT" | sed 's/\.workers\.dev//g' | xargs)
 done
 
-read -p "[INPUT] Do you want to use the default Echo Bot script? (Y/N): " use_default
+echo ""
+echo "[INPUT] Paste your custom JavaScript bot code below."
+echo "When finished, type 'EOF' on a new line and press Enter:"
 bot_code=""
-
-if [ "$use_default" = "N" ] || [ "$use_default" = "n" ]; then
-    echo ""
-    echo "✍️ Paste your custom JavaScript bot code below."
-    echo "When finished, type 'EOF' on a new line and press Enter:"
-    while IFS= read -r line; do
-        if [ "$line" = "EOF" ]; then
-            break
-        fi
-        bot_code+="$line
+while IFS= read -r line; do
+    if [ "$line" = "EOF" ]; then
+        break
+    fi
+    bot_code+="$line
 "
-    done
-else
-    # Default Template
-    bot_code=$(cat << 'EOF'
-export default {
-  async fetch(request, env) {
-    if (request.method !== "POST") {
-      return new Response("Send POST requests only.", { status: 405 });
-    }
-    try {
-      const payload = await request.json();
-      if (payload.message) {
-        const chatId = payload.message.chat.id;
-        const text = payload.message.text || "";
-
-        let replyText = `You said: "${text}". Welcome to Serverless Telegram!`;
-        if (text.startsWith("/start")) {
-          replyText = "Hello! I am running 24/7 serverless on Cloudflare Workers edge network.
-
-Created using ZipLoot Template.";
-        }
-
-        const botToken = env.TELEGRAM_TOKEN;
-        const url = `https://api.telegram.org/bot${botToken}/sendMessage`;
-        await fetch(url, {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
-            chat_id: chatId,
-            text: replyText,
-          }),
-        });
-      }
-      return new Response("OK", { status: 200 });
-    } catch (err) {
-      return new Response(err.toString(), { status: 500 });
-    }
-  }
-};
-EOF
-)
-fi
+done
 
 echo -e "
 [INFO] All inputs collected! Starting automatic setup, please wait...
