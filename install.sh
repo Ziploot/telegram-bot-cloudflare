@@ -22,11 +22,10 @@ else
     echo "✅ Node.js is already installed."
 fi
 
-# Clone template to temp folder
-TEMP_DIR="/tmp/telegram-bot-cloudflare"
-rm -rf "$TEMP_DIR"
-mkdir -p "$TEMP_DIR"
-cd "$TEMP_DIR"
+# Create project folder locally in the user's CURRENT directory instead of Temp
+PROJECT_DIR="$(pwd)/telegram-bot-cloudflare"
+mkdir -p "$PROJECT_DIR"
+cd "$PROJECT_DIR"
 
 echo "📥 Fetching template code from Ziploot repo..."
 curl -sL "https://raw.githubusercontent.com/Ziploot/telegram-bot-cloudflare/main/index.js" -o index.js
@@ -68,3 +67,5 @@ WEBHOOK_URL="https://api.telegram.org/bot${TELEGRAM_TOKEN}/setWebhook?url=${WORK
 curl -s "$WEBHOOK_URL"
 echo ""
 echo "🎉 Congratulations! Your serverless bot is now 24/7 online!"
+echo "📁 Project Folder: $PROJECT_DIR"
+echo "✍️  To edit/paste your custom bot code, open '$PROJECT_DIR/index.js' in VS Code, modify the logic, and run 'npx wrangler deploy' in the terminal to update!"
