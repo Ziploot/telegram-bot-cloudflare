@@ -25,24 +25,30 @@ if (-not $nodeInstalled) {
     Write-Host "✅ Node.js is already installed." -ForegroundColor Green
 }
 
-# Clone the template locally into temp directory to execute
+# Navigate to Home before deleting/creating to avoid folder-in-use locks
 $tempFolder = "$env:TEMP\telegram-bot-cloudflare"
-if (Test-Path $tempFolder) { Remove-Item $tempFolder -Recurse -Force }
-New-Item -ItemType Directory -Path $tempFolder | Out-Null
+if ($pwd.Path -eq $tempFolder) {
+    Set-Location $env:USERPROFILE
+}
+
+if (Test-Path $tempFolder) { 
+    Remove-Item $tempFolder -Recurse -Force -ErrorAction SilentlyContinue 
+}
+New-Item -ItemType Directory -Path $tempFolder -ErrorAction SilentlyContinue | Out-Null
 
 Write-Host "📥 Fetching template code from Ziploot repo..." -ForegroundColor Cyan
-Invoke-WebRequest -UserAgent $ua -Uri "https://raw.githubusercontent.com/Ziploot/telegram-bot-cloudflare/main/index.js" -OutFile "$tempFolder\index.js"
-Invoke-WebRequest -UserAgent $ua -Uri "https://raw.githubusercontent.com/Ziploot/telegram-bot-cloudflare/main/wrangler.json" -OutFile "$tempFolder\wrangler.json"
-Invoke-WebRequest -UserAgent $ua -Uri "https://raw.githubusercontent.com/Ziploot/telegram-bot-cloudflare/main/package.json" -OutFile "$tempFolder\package.json"
+Invoke-WebRequest -UserAgent $ua -Uri "https://raw.githubusercontent.com/Ziploot/telegram-bot-cloudflare/main/index.js?t=$(Get-Date -UFormat %s)" -OutFile "$tempFolder\index.js"
+Invoke-WebRequest -UserAgent $ua -Uri "https://raw.githubusercontent.com/Ziploot/telegram-bot-cloudflare/main/wrangler.json?t=$(Get-Date -UFormat %s)" -OutFile "$tempFolder\wrangler.json"
+Invoke-WebRequest -UserAgent $ua -Uri "https://raw.githubusercontent.com/Ziploot/telegram-bot-cloudflare/main/package.json?t=$(Get-Date -UFormat %s)" -OutFile "$tempFolder\package.json"
 
 Set-Location $tempFolder
 
 Write-Host "📦 Installing dependencies locally..." -ForegroundColor Cyan
-# Run via cmd.exe to bypass PowerShell Execution Policy restriction on npm.ps1
+# Run via cmd.exe to bypass PowerShell Execution Policy restriction
 cmd.exe /c "npm install"
 
 Write-Host "🔑 Logging in to Cloudflare..." -ForegroundColor Cyan
-# Run via cmd.exe to bypass PowerShell Execution Policy restriction on npx.ps1
+# Run via cmd.exe to bypass PowerShell Execution Policy restriction
 cmd.exe /c "npx wrangler login"
 
 $token = Read-Host "`n🔑 Enter your Telegram Bot API Token from @BotFather"
