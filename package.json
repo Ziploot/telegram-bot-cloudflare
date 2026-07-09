@@ -3,10 +3,13 @@
   "version": "1.0.0",
   "description": "Serverless Telegram Bot deployed via Cloudflare Workers",
   "main": "index.js",
+  "bin": {
+    "telegram-bot-setup": "setup.js"
+  },
   "scripts": {
     "deploy": "wrangler deploy"
   },
-  "devDependencies": {
+  "dependencies": {
     "wrangler": "^3.0.0"
   }
 }
