@@ -3,6 +3,8 @@ Write-Host "==============================================" -ForegroundColor Gre
 Write-Host "⚡ ZipLoot - Windows Auto-Installer ⚡" -ForegroundColor Green
 Write-Host "==============================================" -ForegroundColor Green
 
+$ua = "Mozilla/5.0 (Windows NT 10.0; Win64; x64)"
+
 # 1. Check Node.js
 $nodeInstalled = Get-Command node -ErrorAction SilentlyContinue
 if (-not $nodeInstalled) {
@@ -29,17 +31,19 @@ if (Test-Path $tempFolder) { Remove-Item $tempFolder -Recurse -Force }
 New-Item -ItemType Directory -Path $tempFolder | Out-Null
 
 Write-Host "📥 Fetching template code from Ziploot repo..." -ForegroundColor Cyan
-Invoke-WebRequest -Uri "https://raw.githubusercontent.com/Ziploot/telegram-bot-cloudflare/main/index.js" -OutFile "$tempFolder\index.js"
-Invoke-WebRequest -Uri "https://raw.githubusercontent.com/Ziploot/telegram-bot-cloudflare/main/wrangler.json" -OutFile "$tempFolder\wrangler.json"
-Invoke-WebRequest -Uri "https://raw.githubusercontent.com/Ziploot/telegram-bot-cloudflare/main/package.json" -OutFile "$tempFolder\package.json"
+Invoke-WebRequest -UserAgent $ua -Uri "https://raw.githubusercontent.com/Ziploot/telegram-bot-cloudflare/main/index.js" -OutFile "$tempFolder\index.js"
+Invoke-WebRequest -UserAgent $ua -Uri "https://raw.githubusercontent.com/Ziploot/telegram-bot-cloudflare/main/wrangler.json" -OutFile "$tempFolder\wrangler.json"
+Invoke-WebRequest -UserAgent $ua -Uri "https://raw.githubusercontent.com/Ziploot/telegram-bot-cloudflare/main/package.json" -OutFile "$tempFolder\package.json"
 
 Set-Location $tempFolder
 
 Write-Host "📦 Installing dependencies locally..." -ForegroundColor Cyan
-npm install
+# Run via cmd.exe to bypass PowerShell Execution Policy restriction on npm.ps1
+cmd.exe /c "npm install"
 
 Write-Host "🔑 Logging in to Cloudflare..." -ForegroundColor Cyan
-npx wrangler login
+# Run via cmd.exe to bypass PowerShell Execution Policy restriction on npx.ps1
+cmd.exe /c "npx wrangler login"
 
 $token = Read-Host "`n🔑 Enter your Telegram Bot API Token from @BotFather"
 if ([string]::IsNullOrWhiteSpace($token)) {
@@ -48,10 +52,10 @@ if ([string]::IsNullOrWhiteSpace($token)) {
 }
 
 Write-Host "🔒 Saving Telegram token securely in Cloudflare..." -ForegroundColor Cyan
-$token | npx wrangler secret put TELEGRAM_TOKEN
+$token | cmd.exe /c "npx wrangler secret put TELEGRAM_TOKEN"
 
 Write-Host "🚀 Deploying worker to Cloudflare..." -ForegroundColor Cyan
-$deployOutput = npx wrangler deploy
+$deployOutput = cmd.exe /c "npx wrangler deploy"
 Write-Host $deployOutput
 
 # Extract worker url
@@ -65,7 +69,7 @@ Write-Host "✅ Worker live at: $workerUrl" -ForegroundColor Green
 
 Write-Host "🔗 Registering webhook with Telegram API..." -ForegroundColor Cyan
 $webhookUrl = "https://api.telegram.org/bot$($token.Trim())/setWebhook?url=$workerUrl"
-$response = Invoke-RestMethod -Uri $webhookUrl
+$response = Invoke-RestMethod -UserAgent $ua -Uri $webhookUrl
 Write-Host "Response from Telegram: $response"
 
 Write-Host "`n🎉 Congratulations! Your serverless bot is now 24/7 online!" -ForegroundColor Green
