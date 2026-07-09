@@ -22,13 +22,71 @@ else
     echo "✅ Node.js is already installed."
 fi
 
-# Create project folder locally in the user's CURRENT directory instead of Temp
+# Create project folder locally
 PROJECT_DIR="$(pwd)/telegram-bot-cloudflare"
 mkdir -p "$PROJECT_DIR"
 cd "$PROJECT_DIR"
 
-echo "📥 Fetching template code from Ziploot repo..."
-curl -sL "https://raw.githubusercontent.com/Ziploot/telegram-bot-cloudflare/main/index.js" -o index.js
+# 2. Get Bot Code Option
+read -p "❓ Do you want to use the default Echo Bot script? (Y/N): " use_default
+bot_code=""
+
+if [ "$use_default" = "N" ] || [ "$use_default" = "n" ]; then
+    echo ""
+    echo "✍️ Paste your custom JavaScript bot code below."
+    echo "When finished, type 'EOF' on a new line and press Enter:"
+    while IFS= read -r line; do
+        if [ "$line" = "EOF" ]; then
+            break
+        fi
+        bot_code+="$line
+"
+    done
+else
+    # Default Template
+    bot_code=$(cat << 'EOF'
+export default {
+  async fetch(request, env) {
+    if (request.method !== "POST") {
+      return new Response("Send POST requests only.", { status: 405 });
+    }
+    try {
+      const payload = await request.json();
+      if (payload.message) {
+        const chatId = payload.message.chat.id;
+        const text = payload.message.text || "";
+
+        let replyText = `You said: "${text}". Welcome to Serverless Telegram!`;
+        if (text.startsWith("/start")) {
+          replyText = "Hello! I am running 24/7 serverless on Cloudflare Workers edge network.
+
+Created using ZipLoot Template.";
+        }
+
+        const botToken = env.TELEGRAM_TOKEN;
+        const url = `https://api.telegram.org/bot${botToken}/sendMessage`;
+        await fetch(url, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            chat_id: chatId,
+            text: replyText,
+          }),
+        });
+      }
+      return new Response("OK", { status: 200 });
+    } catch (err) {
+      return new Response(err.toString(), { status: 500 });
+    }
+  }
+};
+EOF
+)
+fi
+
+echo -e "$bot_code" > index.js
+
+echo "📥 Fetching package metadata from Ziploot..."
 curl -sL "https://raw.githubusercontent.com/Ziploot/telegram-bot-cloudflare/main/wrangler.json" -o wrangler.json
 curl -sL "https://raw.githubusercontent.com/Ziploot/telegram-bot-cloudflare/main/package.json" -o package.json
 
@@ -67,5 +125,3 @@ WEBHOOK_URL="https://api.telegram.org/bot${TELEGRAM_TOKEN}/setWebhook?url=${WORK
 curl -s "$WEBHOOK_URL"
 echo ""
 echo "🎉 Congratulations! Your serverless bot is now 24/7 online!"
-echo "📁 Project Folder: $PROJECT_DIR"
-echo "✍️  To edit/paste your custom bot code, open '$PROJECT_DIR/index.js' in VS Code, modify the logic, and run 'npx wrangler deploy' in the terminal to update!"
