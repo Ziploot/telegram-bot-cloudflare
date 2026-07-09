@@ -78,19 +78,25 @@ try {
     cmd.exe /c "echo $token | npx wrangler secret put TELEGRAM_TOKEN"
 
     Write-Host "[DEPLOY] Deploying worker to Cloudflare..." -ForegroundColor Cyan
-    $logFile = "$projectFolder\\deploy.log"
-    cmd.exe /c "npx wrangler deploy" | Tee-Object -FilePath $logFile
+    # Run deploy without pipes to keep it 100% interactive for subdomain prompt
+    cmd.exe /c "npx wrangler deploy"
 
-    $deployOutput = Get-Content $logFile -Raw
-
-    # Extract worker url
-    $urlMatch = [regex]::Match($deployOutput, "https://[a-zA-Z0-9.-]+\\.workers\\.dev")
-    if (-not $urlMatch.Success) {
-        Write-Host "[ERROR] Deployment succeeded but URL could not be parsed from logs." -ForegroundColor Red
-        Read-Host "Press Enter to exit..."
-        Exit
+    # Get user subdomain to construct worker URL
+    Write-Host "[INFO] Fetching Cloudflare subdomain..." -ForegroundColor Cyan
+    cmd.exe /c "npx wrangler whoami > whoami.log 2>&1"
+    $whoami = Get-Content whoami.log -Raw
+    $subdomain = ""
+    $subdomainMatch = [regex]::Match($whoami, "Subdomain:\s*([a-zA-Z0-9.-]+)")
+    
+    if ($subdomainMatch.Success) {
+        $subdomain = $subdomainMatch.Groups[1].Value.Trim()
+    } else {
+        Write-Host "[WARN] Could not auto-detect your workers.dev subdomain." -ForegroundColor Yellow
+        $subdomainInput = Read-Host "Please enter your workers.dev subdomain manually (e.g. if your URL is https://my-bot.user.workers.dev, enter 'user')"
+        $subdomain = $subdomainInput.Replace(".workers.dev", "").Trim()
     }
-    $workerUrl = $urlMatch.Value
+
+    $workerUrl = "https://telegram-bot-cloudflare.$subdomain.workers.dev"
     Write-Host "[SUCCESS] Worker live at: $workerUrl" -ForegroundColor Green
 
     Write-Host "[LINK] Registering webhook with Telegram API..." -ForegroundColor Cyan
