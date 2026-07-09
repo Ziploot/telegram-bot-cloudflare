@@ -52,8 +52,8 @@ try {
         } while ($true)
         $botCode = $codeLines -join "`r`n"
     } else {
-        # Default Template
-        $botCode = @"
+        # Default Template (using single-quoted here-string to prevent PowerShell parsing errors)
+        $botCode = @'
 export default {
   async fetch(request, env) {
     if (request.method !== "POST") {
@@ -65,13 +65,15 @@ export default {
         const chatId = payload.message.chat.id;
         const text = payload.message.text || "";
 
-        let replyText = \`You said: "\${text}". Welcome to Serverless Telegram!\`;
+        let replyText = `You said: "${text}". Welcome to Serverless Telegram!`;
         if (text.startsWith("/start")) {
-          replyText = "Hello! I am running 24/7 serverless on Cloudflare Workers edge network.\n\nCreated using ZipLoot Template.";
+          replyText = "Hello! I am running 24/7 serverless on Cloudflare Workers edge network.
+
+Created using ZipLoot Template.";
         }
 
         const botToken = env.TELEGRAM_TOKEN;
-        const url = \`https://api.telegram.org/bot\${botToken}/sendMessage\`;
+        const url = `https://api.telegram.org/bot${botToken}/sendMessage`;
         await fetch(url, {
           method: "POST",
           headers: { "Content-Type": "application/json" },
@@ -87,7 +89,7 @@ export default {
     }
   }
 };
-"@
+'@
     }
 
     # Write bot code to local file
