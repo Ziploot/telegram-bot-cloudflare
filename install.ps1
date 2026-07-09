@@ -7,6 +7,74 @@ try {
     $ua = "Mozilla/5.0 (Windows NT 10.0; Win64; x64)"
     $scriptDir = Split-Path -Parent $MyInvocation.MyCommand.Definition
 
+    # --- COLLECT ALL INPUTS UPFRONT ---
+    
+    $token = ""
+    while ([string]::IsNullOrWhiteSpace($token)) {
+        $token = Read-Host "[INPUT] Enter your Telegram Bot API Token from @BotFather"
+    }
+
+    $subdomain = ""
+    while ([string]::IsNullOrWhiteSpace($subdomain)) {
+        $subdomainInput = Read-Host "[INPUT] Enter your Cloudflare workers.dev subdomain (e.g. 'ziploot')"
+        if (-not [string]::IsNullOrWhiteSpace($subdomainInput)) {
+            $subdomain = $subdomainInput.Replace(".workers.dev", "").Trim()
+        }
+    }
+
+    $useDefault = Read-Host "[INPUT] Do you want to use the default Echo Bot script? (Y/N)"
+    $botCode = ""
+    if ($useDefault.Trim().ToUpper() -eq "N") {
+        Write-Host "`n[INPUT] Paste your custom JavaScript bot code below." -ForegroundColor Cyan
+        Write-Host "When finished, type 'EOF' on a new line and press Enter:" -ForegroundColor Yellow
+        $codeLines = @()
+        do {
+            $line = Read-Host
+            if ($line.Trim() -eq "EOF") { break }
+            $codeLines += $line
+        } while ($true)
+        $botCode = $codeLines -join "`r`n"
+    } else {
+        # Default Template
+        $botCode = @'
+export default {
+  async fetch(request, env) {
+    if (request.method !== "POST") {
+      return new Response("Send POST requests only.", { status: 405 });
+    }
+    try {
+      const payload = await request.json();
+      if (payload.message) {
+        const chatId = payload.message.chat.id;
+        const text = payload.message.text || "";
+
+        let replyText = `You said: "${text}". Welcome to Serverless Telegram!`;
+        if (text.startsWith("/start")) {
+          replyText = "Hello! I am running 24/7 serverless on Cloudflare Workers edge network.\n\nCreated using ZipLoot Template.";
+        }
+
+        const botToken = env.TELEGRAM_TOKEN;
+        const url = `https://api.telegram.org/bot${botToken}/sendMessage`;
+        await fetch(url, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            chat_id: chatId,
+            text: replyText,
+          }),
+        });
+      }
+      return new Response("OK", { status: 200 });
+    } catch (err) {
+      return new Response(err.toString(), { status: 500 });
+    }
+  }
+};
+'@
+    }
+
+    Write-Host "`n[INFO] All inputs collected! Starting automatic setup, please wait...`n" -ForegroundColor Green
+
     # 1. Check Node.js
     $nodeInstalled = Get-Command node -ErrorAction SilentlyContinue
     if (-not $nodeInstalled) {
@@ -36,24 +104,8 @@ try {
         New-Item -ItemType Directory -Path $projectFolder -ErrorAction SilentlyContinue | Out-Null
     }
 
-    # 2. Get Bot Code Option
-    $useDefault = Read-Host "`n[INPUT] Do you want to use the default Echo Bot script? (Y/N)"
-    
-    if ($useDefault.Trim().ToUpper() -eq "N") {
-        Write-Host "`n[INPUT] Paste your custom JavaScript bot code below." -ForegroundColor Cyan
-        Write-Host "When finished, type 'EOF' on a new line and press Enter:" -ForegroundColor Yellow
-        $codeLines = @()
-        do {
-            $line = Read-Host
-            if ($line.Trim() -eq "EOF") { break }
-            $codeLines += $line
-        } while ($true)
-        $botCode = $codeLines -join "`r`n"
-        $botCode | Out-File -FilePath "$projectFolder\\index.js" -Encoding utf8 -Force
-    } else {
-        # Copy the default template index.js already packaged in the ZIP
-        Copy-Item -Path "$scriptDir\\index.js" -Destination "$projectFolder\\index.js" -Force
-    }
+    # Write bot code to local file
+    $botCode | Out-File -FilePath "$projectFolder\\index.js" -Encoding utf8 -Force
 
     # Copy package.json and wrangler.json already packaged in the ZIP
     Copy-Item -Path "$scriptDir\\wrangler.json" -Destination "$projectFolder\\wrangler.json" -Force
@@ -67,41 +119,11 @@ try {
     Write-Host "[LOGIN] Logging in to Cloudflare..." -ForegroundColor Cyan
     cmd.exe /c "npx wrangler login"
 
-    $token = Read-Host "`n[INPUT] Enter your Telegram Bot API Token from @BotFather"
-    if ([string]::IsNullOrWhiteSpace($token)) {
-        Write-Host "[ERROR] Token cannot be empty." -ForegroundColor Red
-        Read-Host "Press Enter to exit..."
-        Exit
-    }
-
     Write-Host "[SECURE] Saving Telegram token securely in Cloudflare..." -ForegroundColor Cyan
     cmd.exe /c "echo $token | npx wrangler secret put TELEGRAM_TOKEN"
 
     Write-Host "[DEPLOY] Deploying worker to Cloudflare..." -ForegroundColor Cyan
-    # Run deploy without pipes to keep it 100% interactive for subdomain prompt
     cmd.exe /c "npx wrangler deploy"
-
-    # Get user subdomain to construct worker URL
-    Write-Host "[INFO] Fetching Cloudflare subdomain..." -ForegroundColor Cyan
-    cmd.exe /c "npx wrangler whoami > whoami.log 2>&1"
-    $whoami = Get-Content whoami.log -Raw
-    $subdomain = ""
-    
-    # Try parsing subdomain
-    $subdomainMatch = [regex]::Match($whoami, "Subdomain:\s*([a-zA-Z0-9.-]+)")
-    if ($subdomainMatch.Success) {
-        $subdomain = $subdomainMatch.Groups[1].Value.Trim()
-    }
-
-    # If parsing failed or subdomain is empty, loop prompt until a valid non-empty string is provided
-    while ([string]::IsNullOrWhiteSpace($subdomain)) {
-        Write-Host "`n[INPUT] Subdomain auto-detection failed (DNS propagation may take a few minutes)." -ForegroundColor Yellow
-        Write-Host "Look at the deploy output above (e.g. https://telegram-bot-cloudflare.YOUR_SUBDOMAIN.workers.dev)" -ForegroundColor Cyan
-        $subdomainInput = Read-Host "Please enter your workers.dev subdomain manually (e.g. 'ziploot')"
-        if (-not [string]::IsNullOrWhiteSpace($subdomainInput)) {
-            $subdomain = $subdomainInput.Replace(".workers.dev", "").Trim()
-        }
-    }
 
     $workerUrl = "https://telegram-bot-cloudflare.$subdomain.workers.dev"
     Write-Host "[SUCCESS] Worker live at: $workerUrl" -ForegroundColor Green
