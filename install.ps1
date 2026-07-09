@@ -86,14 +86,21 @@ try {
     cmd.exe /c "npx wrangler whoami > whoami.log 2>&1"
     $whoami = Get-Content whoami.log -Raw
     $subdomain = ""
-    $subdomainMatch = [regex]::Match($whoami, "Subdomain:\s*([a-zA-Z0-9.-]+)")
     
+    # Try parsing subdomain
+    $subdomainMatch = [regex]::Match($whoami, "Subdomain:\s*([a-zA-Z0-9.-]+)")
     if ($subdomainMatch.Success) {
         $subdomain = $subdomainMatch.Groups[1].Value.Trim()
-    } else {
-        Write-Host "[WARN] Could not auto-detect your workers.dev subdomain." -ForegroundColor Yellow
-        $subdomainInput = Read-Host "Please enter your workers.dev subdomain manually (e.g. if your URL is https://my-bot.user.workers.dev, enter 'user')"
-        $subdomain = $subdomainInput.Replace(".workers.dev", "").Trim()
+    }
+
+    # If parsing failed or subdomain is empty, loop prompt until a valid non-empty string is provided
+    while ([string]::IsNullOrWhiteSpace($subdomain)) {
+        Write-Host "`n[INPUT] Subdomain auto-detection failed (DNS propagation may take a few minutes)." -ForegroundColor Yellow
+        Write-Host "Look at the deploy output above (e.g. https://telegram-bot-cloudflare.YOUR_SUBDOMAIN.workers.dev)" -ForegroundColor Cyan
+        $subdomainInput = Read-Host "Please enter your workers.dev subdomain manually (e.g. 'ziploot')"
+        if (-not [string]::IsNullOrWhiteSpace($subdomainInput)) {
+            $subdomain = $subdomainInput.Replace(".workers.dev", "").Trim()
+        }
     }
 
     $workerUrl = "https://telegram-bot-cloudflare.$subdomain.workers.dev"
