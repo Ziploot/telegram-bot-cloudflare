@@ -14,3 +14,5 @@ npx github:Ziploot/telegram-bot-cloudflare
 - Node.js installed (v18+)
 - Cloudflare Account
 - Telegram Bot API Token from [@BotFather](https://t.me/BotFather)
+
+ 
